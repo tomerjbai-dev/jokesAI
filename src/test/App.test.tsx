@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import indexHtml from '../../index.html?raw'
 import App from '../App.tsx'
 
@@ -95,8 +95,9 @@ describe('joke generation', () => {
     const respond = async (reply: Reply) => {
       await act(async () => pending.shift()?.(reply))
     }
-    const sentBody = (call: number) => JSON.parse((fetchMock.mock.calls[call] as unknown as [string, RequestInit])[1].body as string)
-    return { fetchMock, respond, sentBody }
+    const init = (call: number) => (fetchMock.mock.calls[call] as unknown as [string, RequestInit])[1]
+    const sentBody = (call: number) => JSON.parse(init(call).body as string)
+    return { fetchMock, respond, sentBody, init }
   }
 
   const renderHome = () => {
@@ -190,26 +191,113 @@ describe('joke generation', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('on failure keeps the joke and topic, shows a message and allows retry', async () => {
-    const { respond } = mockFetch()
+  it.each([
+    ['a service failure', { status: 500, body: { code: 'INTERNAL_ERROR', message: 'x' } }, 'אופס, הקומיקאי מעד על הבמה 🤕 אפשר לנסות שוב.'],
+    ['a timeout', { status: 504, body: { code: 'AI_TIMEOUT', message: 'x' } }, 'הבדיחה מתבשלת יותר מדי זמן ⏳ אפשר לנסות שוב.'],
+    ['a refusal', { status: 422, body: { code: 'UNSUPPORTED_TOPIC', message: 'x' } }, 'אפילו לנו יש גבולות להומור 😅 אפשר לנסות נושא אחר!'],
+  ])('on %s keeps the joke and topic, shows the message and retries only manually', async (_label, failure, text) => {
+    const { fetchMock, respond } = mockFetch()
     const ui = renderHome()
     await userEvent.type(ui.field(), 'ים')
     await userEvent.click(ui.button())
     await respond({ status: 200, body: { joke: 'בדיחה על הים' } })
 
     await userEvent.click(ui.button())
-    await respond({ status: 500, body: { code: 'INTERNAL_ERROR', message: 'הודעה מהשרת' } })
-    expect(screen.getByRole('alert')).toHaveTextContent('הודעה מהשרת')
+    await respond(failure)
+    expect(screen.getByRole('alert')).toHaveTextContent(text)
     expect(screen.getByText('בדיחה על הים')).toBeInTheDocument()
     expect(ui.field()).toHaveValue('ים')
     expect(ui.button()).toBeEnabled()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    await userEvent.click(ui.button())
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    await respond({ status: 200, body: { joke: 'בדיחה חדשה על הים' } })
+    expect(screen.getByText('בדיחה חדשה על הים')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('shows the general failure message when the network fails', async () => {
+  it('shows "connection dropped" on the home screen when a request fails while online', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
     const ui = renderHome()
     await userEvent.click(ui.button())
-    expect(await screen.findByRole('alert')).toHaveTextContent('אופס, הקומיקאי מעד על הבמה 🤕 אפשר לנסות שוב.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('החיבור נקטע באמצע הבדיחה 📡 אפשר לנסות שוב.')
+    expect(screen.queryByText('אין חיבור לאינטרנט. בדקו את החיבור ונסו שוב.')).not.toBeInTheDocument()
+    expect(ui.field()).toBeVisible()
+  })
+
+  it('tries to cancel the active request when the page is hidden (refresh/close)', async () => {
+    const { init } = mockFetch()
+    const ui = renderHome()
+    await userEvent.click(ui.button())
+    expect(init(0).signal?.aborted).toBe(false)
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+    expect(init(0).signal?.aborted).toBe(true)
+  })
+})
+
+describe('offline screen', () => {
+  const offlineText = 'אין חיבור לאינטרנט. בדקו את החיבור ונסו שוב.'
+  let online = true
+
+  const setNetwork = (value: boolean) => {
+    online = value
+    act(() => {
+      window.dispatchEvent(new Event(value ? 'online' : 'offline'))
+    })
+  }
+
+  beforeEach(() => {
+    online = true
+    vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('appears when the device goes offline and returns with the same topic and joke', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ joke: 'בדיחה על ים' }), { status: 200 })))
+    localStorage.setItem('ageConfirmed', 'true')
+    render(<App />)
+    await userEvent.type(screen.getByLabelText('נושא לבדיחה'), 'ים')
+    await userEvent.click(screen.getByRole('button'))
+    expect(await screen.findByText('בדיחה על ים')).toBeInTheDocument()
+
+    setNetwork(false)
+    expect(screen.getByText(offlineText)).toBeInTheDocument()
+    expect(screen.getByLabelText('נושא לבדיחה')).not.toBeVisible()
+    expect(screen.getByRole('button', { name: 'נסו שוב' })).toBeInTheDocument()
+
+    setNetwork(true)
+    expect(screen.queryByText(offlineText)).not.toBeInTheDocument()
+    expect(screen.getByText('בדיחה על ים')).toBeVisible()
+    expect(screen.getByLabelText('נושא לבדיחה')).toHaveValue('ים')
+  })
+
+  it('"try again" stays offline without a network and returns once it is back', async () => {
+    online = false
+    localStorage.setItem('ageConfirmed', 'true')
+    render(<App />)
+    expect(screen.getByText(offlineText)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'נסו שוב' }))
+    expect(screen.getByText(offlineText)).toBeInTheDocument()
+
+    online = true
+    await userEvent.click(screen.getByRole('button', { name: 'נסו שוב' }))
+    expect(screen.queryByText(offlineText)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'על מה צוחקים היום? 😂' })).toBeVisible()
+  })
+
+  it('also covers the age declaration', () => {
+    online = false
+    render(<App />)
+    expect(screen.getByText(offlineText)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'כן, אני מעל גיל 18', hidden: true })).not.toBeVisible()
   })
 })
 

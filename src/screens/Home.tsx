@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { MAX_TOPIC_LENGTH, validateTopic, WHITESPACE_TOPIC_MESSAGE } from '../../shared/topic.ts'
 import { requestJoke } from '../jokesApi.ts'
 
@@ -11,6 +11,17 @@ export default function Home() {
   const [message, setMessage] = useState<Message | null>(null)
   // State updates are async, so a ref blocks a second submit fired in the same tick.
   const inFlight = useRef(false)
+  const activeRequest = useRef<AbortController | null>(null)
+
+  // Best-effort cancel of an active request on refresh, close, navigation away or unmount.
+  useEffect(() => {
+    const cancel = () => activeRequest.current?.abort()
+    window.addEventListener('pagehide', cancel)
+    return () => {
+      window.removeEventListener('pagehide', cancel)
+      cancel()
+    }
+  }, [])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -25,10 +36,13 @@ export default function Home() {
     inFlight.current = true
     setLoading(true)
     setMessage(null)
-    const result = await requestJoke(topic.trim(), joke ?? undefined)
-    // The previous joke stays on screen until a new one arrives.
+    const controller = new AbortController()
+    activeRequest.current = controller
+    const result = await requestJoke(topic.trim(), joke ?? undefined, controller.signal)
+    activeRequest.current = null
+    // The previous joke stays on screen until a new one arrives; there is no automatic retry.
     if (result.ok) setJoke(result.joke)
-    else setMessage({ kind: 'error', text: result.message })
+    else if ('message' in result) setMessage({ kind: 'error', text: result.message })
     setLoading(false)
     inFlight.current = false
   }

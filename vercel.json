@@ -1,4 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite"
+  "framework": "vite",
+  "functions": {
+    "api/jokes.ts": { "maxDuration": 40, "supportsCancellation": true }
+  }
 }

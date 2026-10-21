@@ -3,10 +3,19 @@ import OpenAI from 'openai'
 export const DEFAULT_MODEL = 'gpt-5'
 // Reasoning tokens count toward this limit, so it leaves room for both thinking and the joke.
 export const MAX_OUTPUT_TOKENS = 2000
+export const DEFAULT_AI_TIMEOUT_MS = 28000
 
 export type JokeRequest = { topic: string; previousJoke?: string }
 
-export type JokeOutcome = { kind: 'joke'; joke: string } | { kind: 'refused' } | { kind: 'failed' }
+export type JokeOutcome = { kind: 'joke'; joke: string } | { kind: 'refused' } | { kind: 'timeout' } | { kind: 'failed' }
+
+export type GenerateOptions = { signal?: AbortSignal }
+
+// An empty or invalid AI_TIMEOUT_MS falls back to the default.
+export function readTimeoutMs(): number {
+  const value = Number(process.env.AI_TIMEOUT_MS)
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_AI_TIMEOUT_MS
+}
 
 // The minimal slice of the OpenAI client this module uses, so tests can pass a fake.
 export type ResponsesClient = Pick<OpenAI, 'responses'>
@@ -40,17 +49,26 @@ function buildInput({ topic, previousJoke }: JokeRequest): string {
   return parts.join('\n')
 }
 
-export async function generateJoke(request: JokeRequest, client?: ResponsesClient): Promise<JokeOutcome> {
+export async function generateJoke(
+  request: JokeRequest,
+  client?: ResponsesClient,
+  options: GenerateOptions = {},
+): Promise<JokeOutcome> {
+  const timeout = readTimeoutMs()
   try {
-    const openai = client ?? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-    const response = await openai.responses.create({
-      model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
-      instructions: INSTRUCTIONS,
-      input: buildInput(request),
-      reasoning: { effort: 'low' },
-      max_output_tokens: MAX_OUTPUT_TOKENS,
-      text: { format: { type: 'json_schema', name: 'joke_result', strict: true, schema: RESULT_SCHEMA } },
-    })
+    // The SDK retries twice by default; the PRD allows manual retries only.
+    const openai = client ?? new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout, maxRetries: 0 })
+    const response = await openai.responses.create(
+      {
+        model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
+        instructions: INSTRUCTIONS,
+        input: buildInput(request),
+        reasoning: { effort: 'low' },
+        max_output_tokens: MAX_OUTPUT_TOKENS,
+        text: { format: { type: 'json_schema', name: 'joke_result', strict: true, schema: RESULT_SCHEMA } },
+      },
+      { signal: options.signal, timeout, maxRetries: 0 },
+    )
 
     // An incomplete response (e.g. the token limit was hit) is a failure, not a joke.
     if (response.status !== 'completed') return { kind: 'failed' }
@@ -68,6 +86,9 @@ export async function generateJoke(request: JokeRequest, client?: ResponsesClien
     if (status !== 'joke' || typeof joke !== 'string' || joke.trim() === '') return { kind: 'failed' }
     return { kind: 'joke', joke: joke.trim() }
   } catch (error) {
+    if (error instanceof OpenAI.APIConnectionTimeoutError) return { kind: 'timeout' }
+    // The client disconnected (refresh/close); nobody is waiting, and it is not a service failure.
+    if (error instanceof OpenAI.APIUserAbortError) return { kind: 'failed' }
     // Log only the error type: never the topic, the joke or the API key.
     console.error('joke generation failed', { error: error instanceof Error ? error.name : 'unknown' })
     return { kind: 'failed' }

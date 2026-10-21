@@ -255,3 +255,23 @@ APP_TIMEZONE=Asia/Jerusalem
 **הקשר:** טבלת השגיאות המלאה, Timeout וביטול בקשות שייכים ל-Milestone 3, אבל ב-Milestone 2 המסך לא יכול להיתקע כשבקשה נכשלת.
 **החלטה:** `src/jokesApi.ts` מחזיר תמיד תוצאה ולא זורק שגיאה. בכשל מוצג ה-`message` שהשרת החזיר (למשל הודעת הסירוב), ואם אין כזה (כשל רשת או תשובה לא תקינה) מוצגת `אופס, הקומיקאי מעד על הבמה 🤕 אפשר לנסות שוב.`. הבדיחה הקודמת והנושא נשמרים, והכפתור חוזר לפעול.
 **השלכות:** ב-Milestone 3 יש להוסיף מיפוי לפי קוד שגיאה (Timeout, ניתוק, השהיה), `AbortController` ו-Timeout של 35 שניות בלקוח.
+
+### ADR-8: Timeout וביטול בשרת
+**הקשר:** §1.2 סעיף 7 ו-§2.6 דורשים Timeout של 28 שניות בשרת, ביטול Best Effort ואין Retry אוטומטי. ה-SDK של OpenAI מבצע כברירת מחדל 2 ניסיונות חוזרים אוטומטיים, ו-Vercel מעביר את `request.signal` רק כשביטול מופעל במפורש.
+**החלטה:** לקוח OpenAI נוצר עם `timeout` מ-`AI_TIMEOUT_MS` (ברירת מחדל 28000; ערך ריק או לא תקין → ברירת המחדל) ו-`maxRetries: 0`, ואותם ערכים נשלחים גם ברמת הבקשה יחד עם `signal: request.signal`. `APIConnectionTimeoutError` → `504 AI_TIMEOUT`; `APIUserAbortError` (הלקוח התנתק) → כשל רגיל ללא לוג שגיאה. ב-`vercel.json`: `"api/jokes.ts": { "maxDuration": 40, "supportsCancellation": true }`.
+**השלכות:** ביטול הוא Best Effort — קריאת OpenAI שכבר התחילה עשויה להיות מחויבת. יש לוודא ב-Milestone 6 ש-`maxDuration: 40` נתמך בתוכנית ה-Vercel בפועל.
+
+### ADR-9: מיפוי שגיאות בלקוח לפי קוד (מחליף את ADR-7)
+**הקשר:** ADR-7 הציג את ה-`message` מהשרת כפתרון זמני עד Milestone 3.
+**החלטה:** נוסחי FR-05 וה-Offline יושבים ב-`src/messages.ts`. `src/jokesApi.ts` ממפה לפי `code` (`AI_TIMEOUT`, `AI_UNAVAILABLE`, `UNSUPPORTED_TOPIC`), ומשתמש ב-`message` מהשרת רק עבור `INVALID_TOPIC`; כל השאר → הודעה כללית. `fetch` שנדחה → "החיבור נקטע". רשת ביטחון של 35 שניות בלקוח (`setTimeout` + `AbortController`, כדי שיהיה ניתן לבדוק עם Fake Timers). `Home` מבטל את הבקשה הפעילה ב-`pagehide` וב-Unmount; ביטול כזה מסתיים ללא הודעה.
+**השלכות:** הנוסחים מוגדרים גם בשרת וגם בלקוח; הלקוח הוא הקובע מה מוצג.
+
+### ADR-10: מסך Offline כשכבה מעל המסך הנוכחי
+**הקשר:** חזרת החיבור צריכה להחזיר למסך הקודם עם הנושא והבדיחה (`DESIGN.md` §1.5), ומסך ה-Offline מוצג רק כשהדפדפן מדווח שאין רשת.
+**החלטה:** `useOnlineStatus` עוקב אחרי `navigator.onLine` ואירועי `online`/`offline`. כשאין רשת, `App` מציג את `Offline` ומסתיר (`hidden`) את המסך הנוכחי בלי להסיר אותו, כך שה-State של `Home` נשמר. `נסו שוב` קורא שוב את `navigator.onLine`. Service Worker של `vite-plugin-pwa` (`generateSW`) שומר רק את ה-App Shell (כולל גופני Heebo); אין `runtimeCaching`, וה-`navigateFallback` לא חל על `/api/`.
+**השלכות:** Wi-Fi ללא גלישה בפועל נחשב "מחובר", ולכן יוצג "החיבור נקטע" ולא מסך Offline — בהתאם ל-PRD. ה-Service Worker פעיל רק ב-Build (`npm run build` + `npm run preview`), לא ב-`npm run dev` / `dev:full`.
+
+### ADR-11: יצירת אייקונים בסקריפט
+**הקשר:** `DESIGN.md` §2.6 דורש את האות `ב` ב-Heebo 700, אבל ספריית ההמרה לתמונות לא מכירה את הגופן.
+**החלטה:** `scripts/generate-icons.mjs` (`npm run icons`) ממיר את האות ל-Path בעזרת `opentype.js` מתוך קובץ ה-woff של `@fontsource/heebo`, ומייצר עם `sharp` את `favicon.svg`, ‏`pwa-192x192.png`, ‏`pwa-512x512.png`, ‏`pwa-maskable-512x512.png` ו-`apple-touch-icon.png` ב-`public/`.
+**השלכות:** הקבצים שנוצרו נשמרים בפרויקט; אין צורך להריץ את הסקריפט ב-Build. `opentype.js` ו-`sharp` הן devDependencies בלבד.

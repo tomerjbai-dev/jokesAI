@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { handleJokeRequest } from './jokeHandler.js'
-import type { JokeOutcome } from './jokeService.js'
+import type { JokeOutcome, JokeRequest } from './jokeService.js'
 
 const post = (body: unknown) =>
   new Request('http://localhost/api/jokes', {
@@ -10,7 +10,7 @@ const post = (body: unknown) =>
     body: typeof body === 'string' ? body : JSON.stringify(body),
   })
 
-const generator = (outcome: JokeOutcome) => vi.fn(async () => outcome)
+const generator = (outcome: JokeOutcome) => vi.fn(async (_request: JokeRequest, ..._rest: unknown[]) => outcome)
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -23,15 +23,15 @@ describe('POST /api/jokes', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(await response.json()).toEqual({ joke: 'בדיחה' })
-    expect(generate).toHaveBeenCalledWith({ topic: 'חתולים', previousJoke: 'ישנה' })
+    expect(generate.mock.calls[0][0]).toEqual({ topic: 'חתולים', previousJoke: 'ישנה' })
   })
 
   it('generates a general joke for an empty or missing topic', async () => {
     const generate = generator({ kind: 'joke', joke: 'בדיחה' })
     await handleJokeRequest(post({ topic: '' }), generate)
     await handleJokeRequest(post({}), generate)
-    expect(generate).toHaveBeenNthCalledWith(1, { topic: '', previousJoke: undefined })
-    expect(generate).toHaveBeenNthCalledWith(2, { topic: '', previousJoke: undefined })
+    expect(generate.mock.calls[0][0]).toEqual({ topic: '', previousJoke: undefined })
+    expect(generate.mock.calls[1][0]).toEqual({ topic: '', previousJoke: undefined })
   })
 
   it.each([
@@ -59,6 +59,23 @@ describe('POST /api/jokes', () => {
       code: 'UNSUPPORTED_TOPIC',
       message: 'אפילו לנו יש גבולות להומור 😅 אפשר לנסות נושא אחר!',
     })
+  })
+
+  it('maps a timeout to 504 AI_TIMEOUT', async () => {
+    const response = await handleJokeRequest(post({ topic: 'x' }), generator({ kind: 'timeout' }))
+    expect(response.status).toBe(504)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect(await response.json()).toEqual({
+      code: 'AI_TIMEOUT',
+      message: 'הבדיחה מתבשלת יותר מדי זמן ⏳ אפשר לנסות שוב.',
+    })
+  })
+
+  it('passes the request abort signal so a disconnect cancels the OpenAI call', async () => {
+    const generate = generator({ kind: 'joke', joke: 'x' })
+    const request = post({ topic: 'x' })
+    await handleJokeRequest(request, generate)
+    expect(generate).toHaveBeenCalledWith(expect.anything(), undefined, { signal: request.signal })
   })
 
   it('maps a failure to 500 without leaking the API key', async () => {
