@@ -1,0 +1,31 @@
+:root {
+  /* Colors — DESIGN.md §2.1 */
+  --primary-yellow: #fff10a;
+  --secondary-yellow: #fec208;
+  --primary-red: #cf240a;
+  --secondary-red: #ff2d08;
+  --dark: #1f1f1f;
+  --background: #faf9f6;
+  --surface: #ede7dd;
+  --accent-brown: #d9a441;
+  --accent-pink: #fad5d3;
+  --accent-green: #6b7f4a;
+  --text-secondary: #6b6b6b;
+  --white: #ffffff;
+  --border: #d8d4cc;
+
+  /* Typography — DESIGN.md §2.2 */
+  --font-family: 'Heebo', system-ui, 'Segoe UI', Arial, sans-serif;
+  --fs-h1: 32px;
+  --fs-h2: 24px;
+  --fs-h3: 20px;
+  --fs-body: 16px;
+  --fs-caption: 14px;
+
+  /* Spacing, radius, shadow — DESIGN.md §2.3–2.4 */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --radius: 16px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
