@@ -275,3 +275,23 @@ APP_TIMEZONE=Asia/Jerusalem
 **הקשר:** `DESIGN.md` §2.6 דורש את האות `ב` ב-Heebo 700, אבל ספריית ההמרה לתמונות לא מכירה את הגופן.
 **החלטה:** `scripts/generate-icons.mjs` (`npm run icons`) ממיר את האות ל-Path בעזרת `opentype.js` מתוך קובץ ה-woff של `@fontsource/heebo`, ומייצר עם `sharp` את `favicon.svg`, ‏`pwa-192x192.png`, ‏`pwa-512x512.png`, ‏`pwa-maskable-512x512.png` ו-`apple-touch-icon.png` ב-`public/`.
 **השלכות:** הקבצים שנוצרו נשמרים בפרויקט; אין צורך להריץ את הסקריפט ב-Build. `opentype.js` ו-`sharp` הן devDependencies בלבד.
+
+### ADR-12: Cookie שימוש חתום
+**הקשר:** §2.3 ו-§2.9 דורשים מזהה אנונימי ומונה אישי ב-Cookie חתום, HttpOnly, ללא Database.
+**החלטה:** Cookie בשם `bdichomat_usage`, בפורמט `base64url(JSON).base64url(HMAC-SHA256)`, עם `node:crypto` בלבד (`createHmac`, `timingSafeEqual`), ותכונות `HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age` של שנה. ה-Cookie נשלח עם המונה המעודכן אחרי הצלחה, וגם כשהונפק מזהה חדש או שהיום התחלף (בלי שינוי מונה), כדי שהמזהה יישמר ל-Rate Limiting. Cookie שאינו תקין, ארוך מ-1024 תווים או חתום אחרת נחשב כאילו אינו קיים. בלי `COOKIE_SIGNING_SECRET` (או כשהוא קצר מ-32 תווים) `/api/*` מחזירים `500` ולא עובדים.
+**השלכות:** אי אפשר לזייף מונה בלי ה-Secret, אבל Replay של Cookie ישן, מחיקה או דפדפן אחר עוקפים את המכסה האישית — Best Effort, כפי שאושר.
+
+### ADR-13: State של Instance וסדר הבדיקות
+**הקשר:** §2.5 ו-§2.7 מגדירים מונה גלובלי, Rate Limiting ו-Circuit Breaker בזיכרון של כל Function Instance.
+**החלטה:** `server/usageState.ts` מחזיק את שלושתם ברמת המודול, עם שעון שניתן להחליף בבדיקות; בדיקה שיוצרת שני States מדמה שני Instances. ההגדרות נקראות מ-Environment בכל בקשה (`server/config.ts`). הסדר ב-`POST /api/jokes`: Validation → מכסה אישית → מכסה גלובלית → Rate Limiting (הניסיון נרשם רק כאן, לפי מזהה ה-Cookie וגם לפי IP) → Circuit Breaker → AI. סירוב של המודל מאפס את רצף הכשלים (השירות ענה); ביטול של הלקוח (`aborted`) אינו נספר ככשל, ובקשת בדיקה שבוטלה משחררת את מקומה. `GET /api/status` אינו נספר ב-Rate Limiting.
+**השלכות:** בקשות שנחסמו במכסה או ב-Validation אינן צורכות Rate Limiting. בקשות מקבילות עלולות לעבור את המכסות; Instance חדש מתחיל מאפס. כתובת ה-IP משמשת מפתח בזיכרון בלבד ואינה נכתבת ללוג.
+
+### ADR-14: הגבלות בצד הלקוח
+**הקשר:** FR-03/FR-04 דורשים יתרה גלויה, השבתת כפתור וספירה לאחור.
+**החלטה:** `Home` קורא ל-`GET /api/status` בטעינה ובכל חזרה לאפליקציה (`visibilitychange`), ומעדכן את היתרה מכל תשובת הצלחה. יתרה 0, `globalAvailableEstimate: false` או `retryAfterSeconds` משביתים את הכפתור עם ההודעה המתאימה; Rate Limiting משתחרר מעצמו בסוף הספירה. אין טיימר עד חצות — חזרה לאפליקציה אחרי חצות מעדכנת את המצב. אם הסטטוס לא זמין, שורת היתרה מוסתרת והיצירה ממשיכה לעבוד. נוסח הספירה לאחור (`אפשר לנסות שוב בעוד X שניות`) הוא ניסוח שלנו, כי ה-PRD אינו מגדיר אותו.
+**השלכות:** היתרה היא הערכה לפי ה-Cookie; `503 AI_UNAVAILABLE` אינו משבית את הכפתור (FR-05).
+
+### ADR-15: State של Instance אינו נבדק ב-`vercel dev`
+**הקשר:** בבדיקה ידנית של Milestone 4 התברר ש-`vercel dev` מפעיל תהליך חדש לכל בקשה ל-Function ב-Node.js וסוגר אותו בסיומה (`@vercel/node` אינו "persistent" בפיתוח). לכן Rate Limiting, המונה הגלובלי וה-Circuit Breaker מתאפסים בכל בקשה בהרצה המקומית.
+**החלטה:** הלוגיקה נבדקת בבדיקות האוטומטיות, שמריצות כמה בקשות על אותו State. בהרצה המקומית בודקים רק את מה שנשמר ב-Cookie (יתרה אישית ואיפוס יומי) ואת מראה מצבי ההגבלה. התנהגות ה-State בפלטפורמה האמיתית (Instance חם שמשרת כמה בקשות) נבדקת ב-Preview, ב-Milestone 6.
+**השלכות:** אין לשנות קוד כדי "לתקן" את ההרצה המקומית. ב-Vercel עצמו Instances חמים חוזרים לשימוש, ולכן ההגנות פועלות שם במתכונת Best Effort; Cold Start או Instance נוסף מתחילים מאפס, כפי שאושר ב-§1.2.

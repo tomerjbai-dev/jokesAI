@@ -1,21 +1,20 @@
 import OpenAI from 'openai'
+import { readTimeoutMs } from './config.js'
 
 export const DEFAULT_MODEL = 'gpt-5'
 // Reasoning tokens count toward this limit, so it leaves room for both thinking and the joke.
 export const MAX_OUTPUT_TOKENS = 2000
-export const DEFAULT_AI_TIMEOUT_MS = 28000
 
 export type JokeRequest = { topic: string; previousJoke?: string }
 
-export type JokeOutcome = { kind: 'joke'; joke: string } | { kind: 'refused' } | { kind: 'timeout' } | { kind: 'failed' }
+export type JokeOutcome =
+  | { kind: 'joke'; joke: string }
+  | { kind: 'refused' }
+  | { kind: 'timeout' }
+  | { kind: 'failed' }
+  | { kind: 'aborted' }
 
 export type GenerateOptions = { signal?: AbortSignal }
-
-// An empty or invalid AI_TIMEOUT_MS falls back to the default.
-export function readTimeoutMs(): number {
-  const value = Number(process.env.AI_TIMEOUT_MS)
-  return Number.isFinite(value) && value > 0 ? value : DEFAULT_AI_TIMEOUT_MS
-}
 
 // The minimal slice of the OpenAI client this module uses, so tests can pass a fake.
 export type ResponsesClient = Pick<OpenAI, 'responses'>
@@ -88,7 +87,7 @@ export async function generateJoke(
   } catch (error) {
     if (error instanceof OpenAI.APIConnectionTimeoutError) return { kind: 'timeout' }
     // The client disconnected (refresh/close); nobody is waiting, and it is not a service failure.
-    if (error instanceof OpenAI.APIUserAbortError) return { kind: 'failed' }
+    if (error instanceof OpenAI.APIUserAbortError) return { kind: 'aborted' }
     // Log only the error type: never the topic, the joke or the API key.
     console.error('joke generation failed', { error: error instanceof Error ? error.name : 'unknown' })
     return { kind: 'failed' }

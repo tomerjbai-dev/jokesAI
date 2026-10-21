@@ -117,10 +117,10 @@ describe('generateJoke response handling', () => {
     expect(await generateJoke({ topic: 'x' }, client)).toEqual({ kind: 'timeout' })
   })
 
-  it('treats a client disconnect as a failure without logging an error', async () => {
+  it('reports a client disconnect as aborted without logging an error', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { client } = fakeClient(new OpenAI.APIUserAbortError())
-    expect(await generateJoke({ topic: 'x' }, client)).toEqual({ kind: 'failed' })
+    expect(await generateJoke({ topic: 'x' }, client)).toEqual({ kind: 'aborted' })
     expect(log).not.toHaveBeenCalled()
   })
 

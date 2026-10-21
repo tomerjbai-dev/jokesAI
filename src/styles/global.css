@@ -331,6 +331,24 @@ textarea {
   text-align: right;
 }
 
+.message p {
+  margin: 0;
+}
+
+.countdown {
+  font-size: var(--fs-caption);
+  font-weight: 400;
+  color: var(--dark);
+}
+
+/* Daily balance line under the create button */
+.remaining {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 @keyframes wobble {
   from {
     transform: rotate(-15deg) translateY(0);

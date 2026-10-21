@@ -7,6 +7,15 @@ import App from '../App.tsx'
 const confirmLabel = 'כן, אני מעל גיל 18'
 const declineLabel = 'לא, אני מתחת לגיל 18'
 
+// No real network in tests: unless a test stubs fetch, every request (including /api/status) fails.
+beforeEach(() => {
+  vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('no network in tests'))))
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('age gate flow', () => {
   it('shows the age declaration on first visit', () => {
     render(<App />)
@@ -66,9 +75,15 @@ describe('home screen', () => {
     expect(screen.getByText('כתבו נושא לבדיחה, או השאירו ריק ונפתיע אתכם.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'צור בדיחה' })).toBeInTheDocument()
 
-    // Only the create button exists: no menu, history, copy, like or quota UI.
+    // Only the create button exists: no menu, history, copy, like or separate quota screen.
     expect(screen.getAllByRole('button')).toHaveLength(1)
-    expect(screen.queryByText(/נשארו/)).not.toBeInTheDocument()
+  })
+
+  it('hides the balance line when the status is unavailable, and still allows creating', async () => {
+    renderHome()
+    await act(async () => {})
+    expect(screen.queryByText(/נשאר/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'צור בדיחה' })).toBeEnabled()
   })
 
   it('updates the character counter while typing', async () => {
@@ -82,22 +97,25 @@ describe('home screen', () => {
 describe('joke generation', () => {
   type Reply = { status: number; body: unknown }
 
-  // Each call to fetch returns a promise we resolve by hand, so loading states can be inspected.
-  const mockFetch = () => {
+  // Each joke request returns a promise we resolve by hand, so loading states can be inspected.
+  // GET /api/status answers right away with `status` (a failed status hides the balance line).
+  const mockFetch = (status: Reply = { status: 404, body: {} }) => {
     const pending: ((reply: Reply) => void)[] = []
-    const fetchMock = vi.fn(
-      () =>
-        new Promise<Response>((resolve) => {
-          pending.push(({ status, body }) => resolve(new Response(JSON.stringify(body), { status })))
-        }),
+    const fetchMock = vi.fn((url: string, _init?: RequestInit) =>
+      url === '/api/status'
+        ? Promise.resolve(new Response(JSON.stringify(status.body), { status: status.status }))
+        : new Promise<Response>((resolve) => {
+            pending.push(({ status, body }) => resolve(new Response(JSON.stringify(body), { status })))
+          }),
     )
     vi.stubGlobal('fetch', fetchMock)
     const respond = async (reply: Reply) => {
       await act(async () => pending.shift()?.(reply))
     }
-    const init = (call: number) => (fetchMock.mock.calls[call] as unknown as [string, RequestInit])[1]
+    const jokeCalls = () => fetchMock.mock.calls.filter(([url]) => url === '/api/jokes')
+    const init = (call: number) => jokeCalls()[call][1] as RequestInit
     const sentBody = (call: number) => JSON.parse(init(call).body as string)
-    return { fetchMock, respond, sentBody, init }
+    return { fetchMock, respond, sentBody, init, jokeCount: () => jokeCalls().length }
   }
 
   const renderHome = () => {
@@ -133,15 +151,15 @@ describe('joke generation', () => {
   })
 
   it('Enter triggers the same request as the button', async () => {
-    const { fetchMock, sentBody } = mockFetch()
+    const { sentBody, jokeCount } = mockFetch()
     const ui = renderHome()
     await userEvent.type(ui.field(), 'כלבים{Enter}')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(jokeCount()).toBe(1)
     expect(sentBody(0)).toEqual({ topic: 'כלבים' })
   })
 
   it('locks the form while loading and ignores repeated submits', async () => {
-    const { fetchMock, respond } = mockFetch()
+    const { respond, jokeCount } = mockFetch()
     const ui = renderHome()
     await userEvent.click(ui.button())
 
@@ -150,7 +168,7 @@ describe('joke generation', () => {
     expect(ui.button()).toBeDisabled()
     await userEvent.click(ui.button())
     fireEvent.submit(ui.field().closest('form')!)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(jokeCount()).toBe(1)
 
     await respond({ status: 200, body: { joke: 'בדיחה' } })
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
@@ -180,12 +198,12 @@ describe('joke generation', () => {
   })
 
   it('blocks whitespace-only input without calling the API', async () => {
-    const { fetchMock } = mockFetch()
+    const { jokeCount } = mockFetch()
     const ui = renderHome()
     await userEvent.type(ui.field(), '   ')
     await userEvent.click(ui.button())
     expect(screen.getByRole('alert')).toHaveTextContent('רווחים זה נחמד, אבל תנו לנו נושא אמיתי 😅')
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(jokeCount()).toBe(0)
 
     await userEvent.type(ui.field(), 'א')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -196,7 +214,7 @@ describe('joke generation', () => {
     ['a timeout', { status: 504, body: { code: 'AI_TIMEOUT', message: 'x' } }, 'הבדיחה מתבשלת יותר מדי זמן ⏳ אפשר לנסות שוב.'],
     ['a refusal', { status: 422, body: { code: 'UNSUPPORTED_TOPIC', message: 'x' } }, 'אפילו לנו יש גבולות להומור 😅 אפשר לנסות נושא אחר!'],
   ])('on %s keeps the joke and topic, shows the message and retries only manually', async (_label, failure, text) => {
-    const { fetchMock, respond } = mockFetch()
+    const { respond, jokeCount } = mockFetch()
     const ui = renderHome()
     await userEvent.type(ui.field(), 'ים')
     await userEvent.click(ui.button())
@@ -208,10 +226,10 @@ describe('joke generation', () => {
     expect(screen.getByText('בדיחה על הים')).toBeInTheDocument()
     expect(ui.field()).toHaveValue('ים')
     expect(ui.button()).toBeEnabled()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(jokeCount()).toBe(2)
 
     await userEvent.click(ui.button())
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(jokeCount()).toBe(3)
     await respond({ status: 200, body: { joke: 'בדיחה חדשה על הים' } })
     expect(screen.getByText('בדיחה חדשה על הים')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -235,6 +253,124 @@ describe('joke generation', () => {
       window.dispatchEvent(new Event('pagehide'))
     })
     expect(init(0).signal?.aborted).toBe(true)
+  })
+
+  describe('daily balance and limits', () => {
+    const okStatus = (body: Record<string, unknown> = {}) => ({
+      status: 200,
+      body: { remainingToday: 20, dailyLimit: 20, globalAvailableEstimate: true, ...body },
+    })
+    const personalText = 'נגמרו הבדיחות להיום! חזרו מחר לעוד צחוקים 😄'
+    const globalText = 'הקומיקאי שלנו סיים להיום 🎤😴 נגמרו הבדיחות, נתראה מחר!'
+    const rateText = 'רגע, גם לקומיקאי מגיע לנשום 😅'
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('shows the balance under the button and updates it after a success', async () => {
+      const { respond } = mockFetch(okStatus())
+      const ui = renderHome()
+      const line = await screen.findByText('נשארו 20 בדיחות היום')
+      expect(ui.button().compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+      await userEvent.click(ui.button())
+      await respond({ status: 200, body: { joke: 'בדיחה', remainingToday: 19 } })
+      expect(screen.getByText('נשארו 19 בדיחות היום')).toBeInTheDocument()
+    })
+
+    it('uses the singular for the last joke, then shows the quota message and disables the button', async () => {
+      const { respond, jokeCount } = mockFetch(okStatus({ remainingToday: 1 }))
+      const ui = renderHome()
+      expect(await screen.findByText('נשארה בדיחה אחת היום')).toBeInTheDocument()
+
+      await userEvent.click(ui.button())
+      await respond({ status: 200, body: { joke: 'בדיחה אחרונה', remainingToday: 0 } })
+      expect(screen.getByRole('alert')).toHaveTextContent(personalText)
+      expect(ui.button()).toBeDisabled()
+      expect(screen.getByText('בדיחה אחרונה')).toBeInTheDocument()
+
+      fireEvent.submit(ui.field().closest('form')!)
+      expect(jokeCount()).toBe(1)
+    })
+
+    it.each([
+      ['PERSONAL_QUOTA_EXCEEDED', personalText],
+      ['GLOBAL_QUOTA_EXCEEDED', globalText],
+    ])('on 429 %s shows the message, keeps the joke and disables creating', async (code, text) => {
+      const { respond, jokeCount } = mockFetch(okStatus({ remainingToday: 5 }))
+      const ui = renderHome()
+      await userEvent.click(ui.button())
+      await respond({ status: 200, body: { joke: 'בדיחה', remainingToday: 4 } })
+      await userEvent.click(ui.button())
+      await respond({ status: 429, body: { code, message: 'x' } })
+
+      expect(screen.getByRole('alert')).toHaveTextContent(text)
+      expect(screen.getByText('בדיחה')).toBeInTheDocument()
+      expect(ui.button()).toBeDisabled()
+      await userEvent.type(ui.field(), '{Enter}')
+      expect(jokeCount()).toBe(2)
+    })
+
+    it('on 429 RATE_LIMITED counts down, then enables the button again', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] })
+      const { respond, jokeCount } = mockFetch(okStatus())
+      const ui = renderHome()
+      fireEvent.submit(ui.field().closest('form')!)
+      await respond({ status: 429, body: { code: 'RATE_LIMITED', message: 'x', retryAfterSeconds: 3 } })
+
+      expect(screen.getByRole('alert')).toHaveTextContent(rateText)
+      expect(screen.getByText('אפשר לנסות שוב בעוד 3 שניות')).toBeInTheDocument()
+      expect(ui.button()).toBeDisabled()
+      fireEvent.submit(ui.field().closest('form')!)
+      expect(jokeCount()).toBe(1)
+
+      act(() => vi.advanceTimersByTime(1000))
+      expect(screen.getByText('אפשר לנסות שוב בעוד 2 שניות')).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(1000))
+      expect(screen.getByText('אפשר לנסות שוב בעוד שנייה')).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(1000))
+      expect(screen.queryByText(rateText)).not.toBeInTheDocument()
+      expect(ui.button()).toBeEnabled()
+    })
+
+    it('keeps the button active when the service is paused (503)', async () => {
+      const { respond } = mockFetch(okStatus())
+      const ui = renderHome()
+      await userEvent.click(ui.button())
+      await respond({ status: 503, body: { code: 'AI_UNAVAILABLE', message: 'x' } })
+      expect(screen.getByRole('alert')).toHaveTextContent('הקומיקאי לוקח הפסקה קצרה ☕ אפשר לנסות שוב בעוד כמה דקות.')
+      expect(ui.button()).toBeEnabled()
+    })
+
+    it.each([
+      ['an exhausted personal quota', { remainingToday: 0 }, personalText],
+      ['an exhausted global quota', { globalAvailableEstimate: false }, globalText],
+      ['an active rate limit', { retryAfterSeconds: 30 }, rateText],
+    ])('applies %s reported on load', async (_label, status, text) => {
+      mockFetch(okStatus(status))
+      const ui = renderHome()
+      expect(await screen.findByRole('alert')).toHaveTextContent(text)
+      expect(ui.button()).toBeDisabled()
+    })
+
+    it('checks the status again when the app is shown, clearing a limit that ended', async () => {
+      let status = okStatus({ remainingToday: 0 })
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(JSON.stringify(status.body), { status: 200 })),
+      )
+      const ui = renderHome()
+      expect(await screen.findByRole('alert')).toHaveTextContent(personalText)
+
+      status = okStatus()
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(ui.button()).toBeEnabled()
+      expect(screen.getByText('נשארו 20 בדיחות היום')).toBeInTheDocument()
+    })
   })
 })
 

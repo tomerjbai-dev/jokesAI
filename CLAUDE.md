@@ -58,7 +58,7 @@
 
 ## פקודות הרצה
 > Claude ממלא זאת ברגע שהאפליקציה יכולה לרוץ (בדרך כלל בסיום Milestone 1), ומעדכן אם משהו משתנה.
-- **הרצה מלאה (ממשק + API):** `npm run dev:full` (http://localhost:3000) — דורש `vercel login` ו-`vercel link` פעם אחת, ו-`OPENAI_API_KEY` ב-`.env`
+- **הרצה מלאה (ממשק + API):** `npm run dev:full` (http://localhost:3000) — דורש `vercel login` ו-`vercel link` פעם אחת, ו-`OPENAI_API_KEY` ו-`COOKIE_SIGNING_SECRET` ב-`.env`
 - **ממשק בלבד (בלי API):** `npm run dev` (http://localhost:5173)
 - **בדיקת PWA / Offline:** `npm run build` ואז `npm run preview` (http://localhost:4173) — ה-Service Worker פעיל רק כאן; אין `/api`
 - **בדיקות (test):** `npm test` · **Build:** `npm run build` · **יצירת אייקונים מחדש:** `npm run icons`
