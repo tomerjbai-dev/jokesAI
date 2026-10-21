@@ -1,0 +1,6 @@
+export const GENERAL_FAILURE_MESSAGE = 'אופס, הקומיקאי מעד על הבמה 🤕 אפשר לנסות שוב.'
+export const REFUSAL_MESSAGE = 'אפילו לנו יש גבולות להומור 😅 אפשר לנסות נושא אחר!'
+
+export type ErrorCode = 'INVALID_TOPIC' | 'UNSUPPORTED_TOPIC' | 'INTERNAL_ERROR'
+
+export type ErrorBody = { code: ErrorCode; message: string }

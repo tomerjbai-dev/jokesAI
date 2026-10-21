@@ -281,6 +281,65 @@ textarea {
   transform: rotate(-30deg);
 }
 
+.btn:disabled,
+.btn:disabled:hover {
+  background: var(--primary-red);
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.field__input:disabled {
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+/* Joke card */
+.joke-card {
+  padding: var(--space-3);
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.joke-card__text {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.6;
+  text-align: right;
+  white-space: pre-line;
+}
+
+/* Loading and messages */
+.status-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  font-weight: 500;
+}
+
+.status-line__icon {
+  display: inline-block;
+  animation: wobble 0.8s ease-in-out infinite alternate;
+}
+
+.message {
+  color: var(--primary-red);
+  font-weight: 500;
+  text-align: right;
+}
+
+@keyframes wobble {
+  from {
+    transform: rotate(-15deg) translateY(0);
+  }
+  to {
+    transform: rotate(15deg) translateY(-3px);
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -297,5 +356,9 @@ textarea {
 
   .btn {
     transition: none;
+  }
+
+  .status-line__icon {
+    animation: none;
   }
 }

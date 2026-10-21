@@ -58,5 +58,6 @@
 
 ## פקודות הרצה
 > Claude ממלא זאת ברגע שהאפליקציה יכולה לרוץ (בדרך כלל בסיום Milestone 1), ומעדכן אם משהו משתנה.
-- **הרצה (dev):** `npm run dev` (http://localhost:5173)
+- **הרצה מלאה (ממשק + API):** `npm run dev:full` (http://localhost:3000) — דורש `vercel login` ו-`vercel link` פעם אחת, ו-`OPENAI_API_KEY` ב-`.env`
+- **ממשק בלבד (בלי API):** `npm run dev` (http://localhost:5173)
 - **בדיקות (test):** `npm test` · **Build:** `npm run build`

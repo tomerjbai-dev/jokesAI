@@ -1,13 +1,36 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
+import { MAX_TOPIC_LENGTH, validateTopic, WHITESPACE_TOPIC_MESSAGE } from '../../shared/topic.ts'
+import { requestJoke } from '../jokesApi.ts'
 
-const MAX_TOPIC_LENGTH = 100
+type Message = { kind: 'input' | 'error'; text: string }
 
 export default function Home() {
   const [topic, setTopic] = useState('')
+  const [joke, setJoke] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<Message | null>(null)
+  // State updates are async, so a ref blocks a second submit fired in the same tick.
+  const inFlight = useRef(false)
 
-  // Joke generation is wired up in Milestone 2; until then submitting does nothing.
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    if (inFlight.current) return
+
+    const check = validateTopic(topic)
+    if (!check.ok) {
+      if (check.reason === 'whitespace') setMessage({ kind: 'input', text: WHITESPACE_TOPIC_MESSAGE })
+      return
+    }
+
+    inFlight.current = true
+    setLoading(true)
+    setMessage(null)
+    const result = await requestJoke(topic.trim(), joke ?? undefined)
+    // The previous joke stays on screen until a new one arrives.
+    if (result.ok) setJoke(result.joke)
+    else setMessage({ kind: 'error', text: result.message })
+    setLoading(false)
+    inFlight.current = false
   }
 
   return (
@@ -18,10 +41,30 @@ export default function Home() {
         <h1 className="brand">בדיחומט</h1>
       </header>
 
-      <div className="stack stack--center">
-        <h2 className="title">על מה צוחקים היום? 😂</h2>
-        <p className="body-text muted">כתבו נושא לבדיחה, או השאירו ריק ונפתיע אתכם.</p>
-      </div>
+      {joke === null ? (
+        <div className="stack stack--center">
+          <h2 className="title">על מה צוחקים היום? 😂</h2>
+          <p className="body-text muted">כתבו נושא לבדיחה, או השאירו ריק ונפתיע אתכם.</p>
+        </div>
+      ) : (
+        <article className="joke-card" aria-live="polite">
+          <p className="joke-card__text">{joke}</p>
+        </article>
+      )}
+
+      {loading && (
+        <p className="status-line" role="status">
+          <span className="status-line__icon" aria-hidden="true">
+            🎤
+          </span>
+          ממציאים לכם בדיחה...
+        </p>
+      )}
+      {message?.kind === 'error' && (
+        <p className="message" role="alert">
+          {message.text}
+        </p>
+      )}
 
       <form className="topic-form" onSubmit={handleSubmit}>
         <label htmlFor="topic" className="visually-hidden">
@@ -35,7 +78,11 @@ export default function Home() {
             maxLength={MAX_TOPIC_LENGTH}
             rows={4}
             value={topic}
-            onChange={(event) => setTopic(event.target.value)}
+            disabled={loading}
+            onChange={(event) => {
+              setTopic(event.target.value)
+              if (message?.kind === 'input') setMessage(null)
+            }}
             onKeyDown={(event) => {
               // Enter submits; Shift+Enter keeps a newline.
               if (event.key === 'Enter' && !event.shiftKey) {
@@ -49,8 +96,13 @@ export default function Home() {
             {topic.length}/{MAX_TOPIC_LENGTH}
           </span>
         </div>
-        <button type="submit" className="btn btn--primary">
-          צור בדיחה
+        {message?.kind === 'input' && (
+          <p className="message" role="alert">
+            {message.text}
+          </p>
+        )}
+        <button type="submit" className="btn btn--primary" disabled={loading}>
+          {joke === null ? 'צור בדיחה' : 'בדיחה חדשה'}
         </button>
       </form>
     </main>
