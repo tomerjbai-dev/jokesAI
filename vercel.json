@@ -4,6 +4,9 @@
   "functions": {
     "api/jokes.ts": { "maxDuration": 40, "supportsCancellation": true }
   },
+  "rewrites": [
+    { "source": "/((?!api/|@)[^.]*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

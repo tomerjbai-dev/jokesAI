@@ -132,7 +132,7 @@
 **מה יש לממש:**
 - חיבור GitHub Repository ל-Vercel Project אחד; Preview מכל דחיפה לענף `develop`, ו-Production מענף `main` בלבד, שמתעדכן רק בפקודת "פרסם לאוויר" (`CLAUDE.md`).
 - Build ו-TypeScript checks ב-CI (GitHub Actions) על כל דחיפה ל-`develop`; הגדרות Routing ל-`/api/*` ול-SPA, ו-Secrets נפרדים ל-Preview ול-Production.
-- בדיקת משך Function ביחס ל-Timeout של 30 שניות; הגדרת משתני סביבה (כולל `OPENAI_MODEL`); הגדרת מגבלת התקציב המחמירה ביותר שזמינה בפרויקט OpenAI, שהיא ההגנה העיקרית על העלות, ובדיקה אם היא עוצרת בקשות או רק מתריעה.
+- בדיקת משך Function ביחס ל-Timeout של 30 שניות; הגדרת משתני סביבה (כולל `OPENAI_MODEL`). אין מגבלת תקציב בפרויקט OpenAI (באישור בעל המפתח, ראה PRD FR-03).
 - בדיקות End-to-End על Preview ולאחר אישור גם על Production: אישור גיל, יצירה, נושא ריק, Validation, הודעות, מכסות Best Effort, Offline, PWA ופתיחה מחדש.
 - אימות שאין Secrets ב-Git או ב-Bundle ושאין Database/Redis או שירותים לא מאושרים.
 
@@ -144,7 +144,7 @@
 - [ ] Secrets של Production נמצאים רק ב-Vercel Environment Variables המיועדים ל-Production; אין מפתח API ב-Frontend או ב-GitHub Repository.
 - [ ] יצירת בדיחה עובדת באתר החי; PWA ניתנת להתקנה; Offline Screen זמין לאחר Cache ראשוני.
 - [ ] Timeout ומשך הרצת Function תואמים לתוכנית Vercel בפועל.
-- [ ] ניטור שגיאות וזמני תגובה זמין, והוגדרה מגבלת תקציב בפרויקט OpenAI לפני הפרסום ל-Production; הוצג למשתמש אם המגבלה עוצרת בקשות או רק מתריעה.
+- [ ] ניטור שגיאות וזמני תגובה זמין.
 - [ ] הוצגו למשתמש מגבלות ה-Best Effort של מכסות, Rate Limiting ו-Circuit Breaker, ותוצאות בדיקות המדגימות אותן.
 - [ ] לאחר הצגת התוצר ותוצאות ה-Definition of Done, הפיתוח נעצר לקבלת אישור סופי.
 
