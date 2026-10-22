@@ -8,6 +8,7 @@ import {
   RATE_LIMIT_MESSAGE,
   remainingText,
 } from '../messages.ts'
+import SadClown from './SadClown.tsx'
 
 type Message = { kind: 'input' | 'error'; text: string }
 
@@ -205,6 +206,8 @@ export default function Home() {
           <p className="remaining">{remainingText(remaining)}</p>
         )}
       </form>
+
+      <SadClown />
     </main>
   )
 }

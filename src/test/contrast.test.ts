@@ -24,15 +24,16 @@ const ratio = (a: string, b: string) => {
 
 describe('text contrast is at least 4.5:1', () => {
   it.each([
-    ['body text on the page', 'dark', 'background'],
+    ['body text on the page', 'text', 'background'],
     ['secondary text and balance line on the page', 'text-secondary', 'background'],
-    ['placeholder and counter in the field', 'text-secondary', 'white'],
-    ['brand title on the page', 'primary-red', 'background'],
+    ['placeholder and counter in the field', 'text-secondary', 'surface'],
+    ['brand title on the page', 'primary-yellow', 'background'],
     ['primary button label', 'white', 'primary-red'],
     ['primary button label on hover', 'white', 'primary-red-hover'],
-    ['messages', 'dark', 'accent-pink'],
-    ['18+ badge', 'dark', 'white'],
-    ['secondary button', 'dark', 'white'],
+    ['messages', 'text', 'message-bg'],
+    ['18+ badge', 'primary-yellow', 'background'],
+    ['secondary button', 'text', 'surface'],
+    ['joke card text', 'text', 'surface'],
   ])('%s', (_label, text, background) => {
     expect(ratio(color(text), color(background))).toBeGreaterThanOrEqual(4.5)
   })

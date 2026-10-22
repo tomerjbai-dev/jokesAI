@@ -10,11 +10,15 @@ body {
   padding: 0;
 }
 
-/* Cream paper with a faint grain (DESIGN §2.4 Texture); generated noise, no external image. */
+/* An empty stage after the show: a faint, tired spotlight from above over a dark grainy floor.
+   The grain is generated noise, no external image. */
 body {
   background-color: var(--background);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.28 0.09 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  color: var(--dark);
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% 0%, rgba(224, 176, 10, 0.09), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.95 0 0 0 0 0.9 0 0 0 0 0.82 0.06 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-attachment: fixed;
+  color: var(--text);
   font-family: var(--font-family);
   font-size: var(--fs-body);
   line-height: 1.5;
@@ -80,7 +84,8 @@ textarea {
 
 /* Typography */
 .brand {
-  color: var(--primary-red);
+  color: var(--primary-yellow);
+  text-shadow: 0 2px 0 var(--secondary-red);
   font-size: var(--fs-h1);
   font-weight: 700;
   text-align: center;
@@ -152,14 +157,14 @@ textarea {
 }
 
 .btn--secondary {
-  background: var(--white);
+  background: var(--surface);
   border-color: var(--border);
-  color: var(--dark);
+  color: var(--text);
   font-weight: 500;
 }
 
 .btn--secondary:hover {
-  background: var(--surface);
+  background: var(--surface-raised);
 }
 
 /* Topic input */
@@ -179,7 +184,7 @@ textarea {
   min-height: 140px;
   padding: var(--space-2) var(--space-2) 36px;
   resize: none;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -197,7 +202,7 @@ textarea {
   outline: 2px solid transparent;
   border-color: var(--primary-red);
   box-shadow:
-    0 0 0 3px rgba(207, 36, 10, 0.2),
+    0 0 0 3px rgba(179, 32, 12, 0.4),
     var(--shadow);
 }
 
@@ -225,7 +230,11 @@ textarea {
   justify-content: center;
   min-height: 240px;
   margin: 0 calc(-1 * var(--space-3));
-  background: linear-gradient(160deg, var(--secondary-yellow), var(--primary-yellow));
+  /* A dim spotlight on an empty stage instead of a bright yellow banner. */
+  background:
+    radial-gradient(ellipse 70% 90% at 50% 0%, rgba(224, 176, 10, 0.32), transparent 75%),
+    var(--surface);
+  border-bottom: 1px solid var(--border);
   border-radius: 0 0 32px 32px;
   overflow: hidden;
 }
@@ -238,11 +247,11 @@ textarea {
   width: 112px;
   height: 112px;
   margin-bottom: var(--space-3);
-  background: var(--white);
+  background: var(--background);
   border: 6px solid var(--primary-red);
   border-radius: 50%;
   box-shadow: var(--shadow);
-  color: var(--dark);
+  color: var(--primary-yellow);
   font-size: 36px;
   font-weight: 700;
   direction: ltr;
@@ -270,7 +279,7 @@ textarea {
   width: 300px;
   height: 56px;
   background: var(--secondary-red);
-  opacity: 0.4;
+  opacity: 0.5;
   transform: rotate(-24deg);
 }
 
@@ -280,7 +289,7 @@ textarea {
   width: 260px;
   height: 70px;
   background: var(--primary-yellow);
-  opacity: 0.85;
+  opacity: 0.22;
   transform: rotate(-35deg);
 }
 
@@ -289,8 +298,8 @@ textarea {
   right: -90px;
   width: 280px;
   height: 64px;
-  background: var(--secondary-yellow);
-  opacity: 0.7;
+  background: var(--primary-red);
+  opacity: 0.25;
   transform: rotate(-30deg);
 }
 
@@ -303,17 +312,18 @@ textarea {
 }
 
 .field__input:disabled {
-  background: var(--surface);
+  background: var(--background);
   color: var(--text-secondary);
   cursor: not-allowed;
 }
 
 /* Joke card */
-/* A light cream card lifted off the textured page by a soft shadow, as in the mockup. */
+/* A dark card lifted off the stage; a thin yellow edge at the top catches the spotlight. */
 .joke-card {
   padding: var(--space-3);
-  background: var(--background);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top-color: rgba(224, 176, 10, 0.35);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
@@ -341,14 +351,14 @@ textarea {
   animation: wobble 0.8s ease-in-out infinite alternate;
 }
 
-/* Errors, limits and input hints share one look. Dark text keeps contrast on the pink tint;
+/* Errors, limits and input hints share one look. Light text keeps contrast on the dim red wash;
    the red edge marks it as a message without relying on color alone (the text says what happened). */
 .message {
   padding: var(--space-1) var(--space-2);
-  background: var(--accent-pink);
+  background: var(--message-bg);
   border-inline-start: 4px solid var(--primary-red);
   border-radius: var(--radius);
-  color: var(--dark);
+  color: var(--text);
   font-weight: 500;
   text-align: right;
   overflow-wrap: anywhere;
@@ -361,7 +371,7 @@ textarea {
 .countdown {
   font-size: var(--fs-caption);
   font-weight: 400;
-  color: var(--dark);
+  color: var(--text);
 }
 
 /* Daily balance line under the create button */
@@ -370,6 +380,52 @@ textarea {
   font-size: var(--fs-caption);
   color: var(--text-secondary);
   text-align: center;
+}
+
+/* Crying clown at the bottom of the main screen: pushed down by the free space, swaying slowly. */
+.sad-clown {
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+  padding-top: var(--space-2);
+  opacity: 0.9;
+}
+
+.sad-clown__head {
+  transform-origin: 80px 160px;
+  animation: sigh 5s ease-in-out infinite;
+}
+
+.sad-clown__tear {
+  animation: tear-fall 2.4s ease-in infinite;
+}
+
+.sad-clown__tear--late {
+  animation-delay: 1.2s;
+}
+
+@keyframes sigh {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(3deg) translateY(3px);
+  }
+}
+
+@keyframes tear-fall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(40px);
+    opacity: 0;
+  }
 }
 
 @keyframes wobble {
@@ -403,7 +459,18 @@ textarea {
     transform: none;
   }
 
-  .status-line__icon {
+  .status-line__icon,
+  .sad-clown__head {
     animation: none;
+  }
+
+  /* Keep one tear in place so the clown still reads as crying. */
+  .sad-clown__tear {
+    animation: none;
+    transform: translateY(6px);
+  }
+
+  .sad-clown__tear--late {
+    display: none;
   }
 }
