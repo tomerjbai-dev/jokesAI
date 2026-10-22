@@ -76,7 +76,7 @@ Claude עוצר בכל אחד מאלה ומסביר בשפה פשוטה מה ל�
 2. **ענף Production:** Settings → Environments → Production → Branch = `main`. כל ענף אחר (כלומר `develop`) יוצר Preview.
 3. **משתני סביבה** (Settings → Environment Variables):
    - `OPENAI_API_KEY` — אותו מפתח ל-Preview ול-Production (החלטת המשתמש, §9), מסומן Sensitive.
-   - `OPENAI_MODEL=gpt-5` — Preview ו-Production (מפורש, למרות שזו ברירת המחדל).
+   - `OPENAI_MODEL` — לא מוגדר (החלטת המשתמש); הקוד משתמש בברירת המחדל `gpt-5`. לבדיקת ה-Circuit Breaker (§5.3) יוגדר זמנית ב-Preview בלבד.
    - `COOKIE_SIGNING_SECRET` — לא מוגדר (החלטת המשתמש, §9); נשאר הסוד המובנה.
    - שאר ההגדרות (מכסות, Rate Limiting, Timeout, Circuit Breaker) — לא מוגדרות, כך שחלות ברירות המחדל.
 4. **מגבלת תקציב ב-OpenAI — לא מוגדרת** (החלטת המשתמש, §9). אין צעד כזה.

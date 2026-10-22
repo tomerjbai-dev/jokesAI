@@ -335,3 +335,8 @@ APP_TIMEZONE=Asia/Jerusalem
 **הקשר:** §2.10 דורש Node.js LTS הנתמך ב-Vercel; מקומית רץ Node 24.
 **החלטה:** `"engines": { "node": "24.x" }` ב-`package.json`. Vercel בוחר לפיו את גרסת ה-Functions וה-Build, וה-CI משתמש ב-Node 24.
 **השלכות:** אותה גרסה מקומית, ב-CI וב-Vercel. מעבר גרסה בעתיד — בשינוי השדה וב-`ci.yml`.
+
+### ADR-24: ממצאי הפלטפורמה ב-Preview
+**הקשר:** ADR-8, ADR-15, ADR-16, ADR-17 ו-ADR-18 השאירו לבדיקה ב-Vercel עצמו: `maxDuration`, State של Instance, התאמת `Origin`, HSTS ושמירת לוגים.
+**החלטה (תיעוד ממצאים, 22.10.2026):** הפרויקט בתוכנית **Hobby**, עם Node 24.x ו-Preset ‏Vite. ה-Deployment עם `maxDuration: 40` נבנה ורץ; זמני יצירה בפועל 5–11 שניות. `Origin` של הדפדפן תואם ל-`new URL(request.url).origin` בדומיין של Vercel, ולכן אין צורך ברשימת דומיינים; Origin זר מקבל `403`. Vercel מוסיף `Strict-Transport-Security` (‏`max-age=63072000; includeSubDomains; preload`), וכל שאר הכותרות וה-CSP מגיעות. Rate Limiting פעל ב-Instance חם: הבקשה השישית בדקה קיבלה `429` עם ספירה לאחור. ב-Hobby ה-Runtime Logs נשמרים פחות משעה; שורות `joke_request` מופיעות בלי נושא, בדיחה, Cookie או IP. Preview מוגן ב-Vercel Authentication; Production ציבורי. משתנה הסביבה היחיד הוא `OPENAI_API_KEY` (אותו מפתח ב-Preview וב-Production), בלי `OPENAI_MODEL` ובלי `COOKIE_SIGNING_SECRET` — החלטת המשתמש.
+**השלכות:** אין היסטוריית לוגים לטווח ארוך; בדיקת תקלה צריכה להיעשות סמוך להתרחשותה. בדיקות Preview צורכות מאותו מפתח של Production. הכתובת הקבועה של ה-Preview היא `jokesai-git-develop-tom-6ed1.vercel.app`.

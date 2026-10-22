@@ -61,4 +61,5 @@
 - **הרצה מלאה (ממשק + API):** `npm run dev:full` (http://localhost:3000) — דורש `vercel login` ו-`vercel link` פעם אחת, ו-`OPENAI_API_KEY` ב-`.env` (זה המשתנה היחיד שנדרש)
 - **ממשק בלבד (בלי API):** `npm run dev` (http://localhost:5173)
 - **בדיקת PWA / Offline / CSP:** `npm run build` ואז `npm run preview` (http://localhost:4173) — ה-Service Worker וה-Content Security Policy פעילים רק כאן; אין `/api`
+- **גרסת ניסיון (Preview, ענף `develop`):** https://jokesai-git-develop-tom-6ed1.vercel.app — נעולה למי שאינו מחובר ל-Vercel. **Production (ענף `main`):** https://jokesai.vercel.app · לוגים: Vercel → jokesai → Logs (ב-Hobby נשמרים פחות משעה)
 - **בדיקות (test):** `npm test` · **Build:** `npm run build` · **יצירת אייקונים מחדש:** `npm run icons`
