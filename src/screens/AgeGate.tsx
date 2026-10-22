@@ -12,7 +12,7 @@ export default function AgeGate({ onConfirm, onDecline }: Props) {
       </div>
 
       <div className="stack stack--center">
-        <h2 className="title">ברוכים הבאים לבדיחומט</h2>
+        <h1 className="title">ברוכים הבאים לבדיחומט</h1>
         <p className="body-text">
           האפליקציה מיועדת למשתמשים בני 18 ומעלה וכוללת בדיחות בנושאים למבוגרים.
         </p>

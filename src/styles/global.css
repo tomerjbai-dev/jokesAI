@@ -10,14 +10,15 @@ body {
   padding: 0;
 }
 
+/* Cream paper with a faint grain (DESIGN §2.4 Texture); generated noise, no external image. */
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.28 0.09 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color: var(--dark);
   font-family: var(--font-family);
   font-size: var(--fs-body);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 h1,
@@ -51,7 +52,8 @@ textarea {
   max-width: 480px;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
+  padding: calc(var(--space-3) + env(safe-area-inset-top)) var(--space-3)
+    calc(var(--space-3) + env(safe-area-inset-bottom));
   overflow: hidden;
   animation: fade-in 0.25s ease-out;
 }
@@ -89,6 +91,10 @@ textarea {
   font-size: var(--fs-h2);
   font-weight: 700;
   line-height: 1.3;
+}
+
+.title--small {
+  font-size: var(--fs-h3);
 }
 
 .body-text {
@@ -130,7 +136,7 @@ textarea {
 }
 
 .btn:focus-visible {
-  outline: 3px solid var(--dark);
+  outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
 }
 
@@ -142,7 +148,7 @@ textarea {
 }
 
 .btn--primary:hover {
-  background: #b81f08;
+  background: var(--primary-red-hover);
 }
 
 .btn--secondary {
@@ -179,14 +185,16 @@ textarea {
   box-shadow: var(--shadow);
   font-size: var(--fs-body);
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .field__input::placeholder {
   color: var(--text-secondary);
 }
 
+/* The ring is a shadow; the transparent outline still shows in forced-colors (high contrast) mode. */
 .field__input:focus {
-  outline: none;
+  outline: 2px solid transparent;
   border-color: var(--primary-red);
   box-shadow:
     0 0 0 3px rgba(207, 36, 10, 0.2),
@@ -206,12 +214,16 @@ textarea {
   padding-top: 0;
 }
 
+.screen--age .age-hero {
+  padding-top: env(safe-area-inset-top);
+}
+
 .age-hero {
   position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  height: 220px;
+  min-height: 240px;
   margin: 0 calc(-1 * var(--space-3));
   background: linear-gradient(160deg, var(--secondary-yellow), var(--primary-yellow));
   border-radius: 0 0 32px 32px;
@@ -243,41 +255,42 @@ textarea {
   color: var(--primary-red);
 }
 
-/* Decorative brush strokes */
+/* Decorative brush strokes: one original stroke shape used as a mask, colored per variant. */
 .brush {
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  border-radius: 40% 60% 55% 45%;
+  -webkit-mask: url('../assets/brush.svg') center / 100% 100% no-repeat;
+  mask: url('../assets/brush.svg') center / 100% 100% no-repeat;
 }
 
 .brush--hero {
   top: 30px;
   right: -40px;
-  width: 260px;
-  height: 46px;
+  width: 300px;
+  height: 56px;
   background: var(--secondary-red);
-  opacity: 0.35;
+  opacity: 0.4;
   transform: rotate(-24deg);
 }
 
 .brush--corner {
-  top: -20px;
-  left: -70px;
-  width: 220px;
-  height: 60px;
+  top: -10px;
+  left: -80px;
+  width: 260px;
+  height: 70px;
   background: var(--primary-yellow);
-  opacity: 0.7;
+  opacity: 0.85;
   transform: rotate(-35deg);
 }
 
 .brush--bottom {
   bottom: 30px;
-  right: -80px;
-  width: 240px;
-  height: 50px;
+  right: -90px;
+  width: 280px;
+  height: 64px;
   background: var(--secondary-yellow);
-  opacity: 0.55;
+  opacity: 0.7;
   transform: rotate(-30deg);
 }
 
@@ -296,19 +309,22 @@ textarea {
 }
 
 /* Joke card */
+/* A light cream card lifted off the textured page by a soft shadow, as in the mockup. */
 .joke-card {
   padding: var(--space-3);
-  background: var(--white);
+  background: var(--background);
+  border: 1px solid rgba(0, 0, 0, 0.04);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 
 .joke-card__text {
-  font-size: 18px;
+  font-size: var(--fs-joke);
   font-weight: 500;
   line-height: 1.6;
   text-align: right;
   white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 /* Loading and messages */
@@ -325,10 +341,17 @@ textarea {
   animation: wobble 0.8s ease-in-out infinite alternate;
 }
 
+/* Errors, limits and input hints share one look. Dark text keeps contrast on the pink tint;
+   the red edge marks it as a message without relying on color alone (the text says what happened). */
 .message {
-  color: var(--primary-red);
+  padding: var(--space-1) var(--space-2);
+  background: var(--accent-pink);
+  border-inline-start: 4px solid var(--primary-red);
+  border-radius: var(--radius);
+  color: var(--dark);
   font-weight: 500;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .message p {
@@ -374,6 +397,10 @@ textarea {
 
   .btn {
     transition: none;
+  }
+
+  .btn:active {
+    transform: none;
   }
 
   .status-line__icon {

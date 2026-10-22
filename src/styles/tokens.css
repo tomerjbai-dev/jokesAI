@@ -13,6 +13,9 @@
   --text-secondary: #6b6b6b;
   --white: #ffffff;
   --border: #d8d4cc;
+  /* Hover only: a darker shade of primary-red, not a new brand color. */
+  --primary-red-hover: #b81f08;
+  --focus-ring: var(--dark);
 
   /* Typography — DESIGN.md §2.2 */
   --font-family: 'Heebo', system-ui, 'Segoe UI', Arial, sans-serif;
@@ -21,6 +24,7 @@
   --fs-h3: 20px;
   --fs-body: 16px;
   --fs-caption: 14px;
+  --fs-joke: 18px;
 
   /* Spacing, radius, shadow — DESIGN.md §2.3–2.4 */
   --space-1: 8px;

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 80" preserveAspectRatio="none">
+  <!-- Original dry-brush stroke, used as a CSS mask; the color comes from CSS. -->
+  <path d="M6 44 C 20 30, 40 22, 70 20 L 92 14 L 110 19 L 140 12 L 168 17 L 196 10 L 226 15 L 250 9 L 280 14 L 306 8 L 334 13 L 360 11 L 384 18 C 396 24, 398 34, 392 42 L 380 47 L 386 54 L 362 58 L 340 66 L 312 62 L 290 70 L 262 64 L 236 71 L 210 65 L 182 72 L 156 66 L 128 71 L 100 64 L 76 68 L 50 62 L 26 60 C 12 57, 2 52, 6 44 Z"/>
+  <path d="M30 22 L 120 8 L 122 11 L 34 26 Z" opacity="0.8"/>
+  <path d="M150 4 L 290 0 L 290 4 L 152 8 Z" opacity="0.7"/>
+  <path d="M60 74 L 200 78 L 200 80 L 62 78 Z" opacity="0.7"/>
+  <path d="M250 74 L 370 68 L 371 71 L 252 78 Z" opacity="0.8"/>
+</svg>

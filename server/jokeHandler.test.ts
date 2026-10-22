@@ -15,6 +15,7 @@ const post = (body: unknown, { cookie, ip = '203.0.113.7' }: Options = {}) =>
   new Request('http://localhost/api/jokes', {
     method: 'POST',
     headers: {
+      Origin: 'http://localhost',
       'Content-Type': 'application/json',
       'x-forwarded-for': ip,
       ...(cookie ? { Cookie: cookie } : {}),
@@ -40,6 +41,8 @@ let clock: number
 let state: UsageState
 
 beforeEach(() => {
+  // Every request writes a structured log line; keep test output quiet.
+  vi.spyOn(console, 'log').mockImplementation(() => {})
   vi.stubEnv('COOKIE_SIGNING_SECRET', SECRET)
   clock = NOON
   state = createUsageState(() => clock)
@@ -127,13 +130,12 @@ describe('POST /api/jokes', () => {
     })
   })
 
-  it('refuses to work without a cookie signing secret', async () => {
+  it('works without a cookie signing secret, using the built-in one (ADR-19)', async () => {
     vi.stubEnv('COOKIE_SIGNING_SECRET', '')
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    const generate = generator({ kind: 'joke', joke: 'x' })
-    const response = await send({ topic: 'x' }, generate)
-    expect(response.status).toBe(500)
-    expect(generate).not.toHaveBeenCalled()
+    const first = await send({ topic: 'x' })
+    expect(first.status).toBe(200)
+    const second = await send({ topic: 'x' }, undefined, { cookie: cookieFrom(first), ip: '10.9.0.1' })
+    expect((await second.json()).remainingToday).toBe(18)
   })
 })
 
@@ -367,5 +369,96 @@ describe('best-effort limits (documented, not guaranteed)', () => {
     for (let i = 0; i < 5; i++) await send({ topic: 'x' }, generator({ kind: 'failed' }), { ip: `10.6.0.${i}` })
     expect(state.circuitBreaker.state()).toBe('open')
     expect(other.circuitBreaker.state()).toBe('closed')
+  })
+})
+
+describe('request checks before any limit (ARCHITECTURE §2.9)', () => {
+  const raw = (headers: Record<string, string>, body = '{"topic":"x"}') =>
+    handleJokeRequest(
+      new Request('http://localhost/api/jokes', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '203.0.113.7', ...headers },
+        body,
+      }),
+      { generateJoke: generate, state },
+    )
+  const generate = generator({ kind: 'joke', joke: 'x' })
+
+  it('rejects a foreign Origin, a non-JSON type and an oversized body without calling OpenAI or counting', async () => {
+    for (let i = 0; i < 4; i++) {
+      expect((await raw({ Origin: 'https://evil.example', 'Content-Type': 'application/json' })).status).toBe(403)
+      expect((await raw({ 'Content-Type': 'application/json' })).status).toBe(403)
+      expect((await raw({ Origin: 'http://localhost', 'Content-Type': 'text/plain' })).status).toBe(415)
+      const big = JSON.stringify({ topic: 'x', previousJoke: 'א'.repeat(3000) })
+      expect((await raw({ Origin: 'http://localhost', 'Content-Type': 'application/json' }, big)).status).toBe(413)
+    }
+    expect(generate).not.toHaveBeenCalled()
+    // 16 rejected requests did not use up the 5-per-minute rate limit.
+    expect((await send({ topic: 'x' })).status).toBe(200)
+  })
+
+  it('treats a forged cookie as no cookie: a new id at zero, while the IP rate limit still applies', async () => {
+    const forged = `${USAGE_COOKIE_NAME}=${usageCookie({ successCount: 20 }).split('=')[1].replace(/.$/, 'A')}`
+    for (let i = 0; i < 5; i++) await send({ topic: 'x' }, undefined, { ip: '10.7.0.1' })
+    const response = await send({ topic: 'x' }, undefined, { cookie: forged, ip: '10.7.0.1' })
+    expect(response.status).toBe(429)
+    expect((await response.json()).code).toBe('RATE_LIMITED')
+
+    const fresh = await send({ topic: 'x' }, undefined, { cookie: forged, ip: '10.7.0.2' })
+    expect((await fresh.json()).remainingToday).toBe(19)
+    const usage = readUsageCookie(new Request('http://x', { headers: { Cookie: cookieFrom(fresh)! } }), SECRET)
+    expect(usage?.id).not.toBe('user-1')
+  })
+})
+
+describe('operational logs (PRD FR-07)', () => {
+  const lines = () =>
+    [console.log, console.warn, console.error].flatMap((spy) =>
+      vi.mocked(spy).mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>),
+    )
+
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  it('writes exactly one joke_request line per request, with status, code, latency and circuit state', async () => {
+    await send({ topic: 'x' })
+    await send({ topic: '   ' })
+    const requests = lines().filter((line) => line.event === 'joke_request')
+    expect(requests).toHaveLength(2)
+    expect(requests[0]).toMatchObject({ level: 'info', status: 200, code: 'OK', circuit: 'closed' })
+    expect(requests[1]).toMatchObject({ status: 400, code: 'INVALID_TOPIC' })
+    expect(typeof requests[0].latencyMs).toBe('number')
+    expect(typeof requests[0].requestId).toBe('string')
+  })
+
+  it('uses the Vercel request id when present', async () => {
+    const request = post({ topic: 'x' })
+    request.headers.set('x-vercel-id', 'fra1::abc-123')
+    await handleJokeRequest(request, { generateJoke: generator({ kind: 'joke', joke: 'x' }), state })
+    expect(lines()[0].requestId).toBe('fra1::abc-123')
+  })
+
+  it('never logs the topic, the joke, the previous joke, the cookie, the anonymous id or the IP', async () => {
+    const cookie = usageCookie({ id: 'anon-id-secret-42' })
+    const outcomes: JokeOutcome[] = [
+      { kind: 'joke', joke: 'בדיחה-סודית-777' },
+      { kind: 'refused' },
+      { kind: 'timeout' },
+      { kind: 'failed' },
+    ]
+    for (const outcome of outcomes) {
+      await send({ topic: 'נושא-סודי-123', previousJoke: 'קודמת-סודית-555' }, generator(outcome), {
+        cookie,
+        ip: '198.51.100.99',
+      })
+    }
+    const written = JSON.stringify([console.log, console.warn, console.error].map((spy) => vi.mocked(spy).mock.calls))
+    for (const secret of ['נושא-סודי-123', 'בדיחה-סודית-777', 'קודמת-סודית-555', 'anon-id-secret-42', '198.51.100.99']) {
+      expect(written).not.toContain(secret)
+    }
+    expect(written).not.toContain(cookie.split('=')[1])
+    expect(written).not.toContain(SECRET)
   })
 })

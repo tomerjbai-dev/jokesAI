@@ -72,10 +72,22 @@ describe('circuit breaker (one instance)', () => {
     expect(breaker.acquire(settings)).toBe('probe')
   })
 
-  it('logs when it opens, without user data', () => {
+  it('logs one structured line when it opens and one when a probe closes it', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { breaker } = setup()
-    for (let i = 0; i < 5; i++) breaker.recordFailure(settings)
-    expect(warn).toHaveBeenCalledWith('circuit breaker opened')
+    const info = vi.spyOn(console, 'log').mockImplementation(() => {})
+    warn.mockClear()
+    info.mockClear()
+    const { breaker, advance } = setup()
+    for (let i = 0; i < 6; i++) breaker.recordFailure(settings)
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(warn.mock.calls[0][0])).toMatchObject({ level: 'warn', event: 'circuit_opened', failures: 5 })
+    expect(breaker.state()).toBe('open')
+
+    advance(120_000)
+    expect(breaker.acquire(settings)).toBe('probe')
+    expect(breaker.state()).toBe('half-open')
+    breaker.recordSuccess()
+    expect(breaker.state()).toBe('closed')
+    expect(JSON.parse(info.mock.calls[0][0])).toMatchObject({ event: 'circuit_closed' })
   })
 })

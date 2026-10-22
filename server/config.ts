@@ -13,7 +13,11 @@ export const DEFAULTS = {
 // A shorter secret would make the cookie signature easy to brute-force.
 export const MIN_SECRET_LENGTH = 32
 
-export type Config = typeof DEFAULTS & { cookieSecret: string | null }
+// Used when COOKIE_SIGNING_SECRET is not set (ADR-19). It is public in the repository, so anyone can
+// forge a usage cookie; acceptable for this study project, where only the OpenAI key is configured.
+export const BUILT_IN_COOKIE_SECRET = 'bdichomat-built-in-cookie-secret-not-private'
+
+export type Config = typeof DEFAULTS & { cookieSecret: string }
 
 // An empty, non-numeric or non-positive value falls back to the default.
 function positiveInt(name: string, fallback: number): number {
@@ -46,6 +50,6 @@ export function readConfig(): Config {
     circuitFailureThreshold: positiveInt('CIRCUIT_FAILURE_THRESHOLD', DEFAULTS.circuitFailureThreshold),
     circuitOpenMs: positiveInt('CIRCUIT_OPEN_MS', DEFAULTS.circuitOpenMs),
     timeZone: timeZone(),
-    cookieSecret: secret.length >= MIN_SECRET_LENGTH ? secret : null,
+    cookieSecret: secret.length >= MIN_SECRET_LENGTH ? secret : BUILT_IN_COOKIE_SECRET,
   }
 }

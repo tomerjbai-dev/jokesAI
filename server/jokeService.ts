@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { readTimeoutMs } from './config.js'
+import { logEvent } from './log.js'
 
 export const DEFAULT_MODEL = 'gpt-5'
 // Reasoning tokens count toward this limit, so it leaves room for both thinking and the joke.
@@ -89,7 +90,7 @@ export async function generateJoke(
     // The client disconnected (refresh/close); nobody is waiting, and it is not a service failure.
     if (error instanceof OpenAI.APIUserAbortError) return { kind: 'aborted' }
     // Log only the error type: never the topic, the joke or the API key.
-    console.error('joke generation failed', { error: error instanceof Error ? error.name : 'unknown' })
+    logEvent({ event: 'ai_error', errorName: error instanceof Error ? error.name : 'unknown' })
     return { kind: 'failed' }
   }
 }

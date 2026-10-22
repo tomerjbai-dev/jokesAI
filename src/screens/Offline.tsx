@@ -9,11 +9,11 @@ export default function Offline({ onRetry }: Props) {
     <main className="screen">
       <span className="brush brush--corner" aria-hidden="true" />
       <header className="brand-header">
-        <p className="brand">בדיחומט</p>
+        <h1 className="brand">בדיחומט</h1>
       </header>
 
       <div className="stack stack--center stack--spaced">
-        <h2 className="title" role="alert">
+        <h2 className="title title--small" role="alert">
           {OFFLINE_MESSAGE}
         </h2>
       </div>

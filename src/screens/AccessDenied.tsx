@@ -7,7 +7,7 @@ export default function AccessDenied({ onBack }: Props) {
     <main className="screen">
       <span className="brush brush--corner" aria-hidden="true" />
       <header className="brand-header">
-        <p className="brand">בדיחומט</p>
+        <h1 className="brand">בדיחומט</h1>
       </header>
 
       <div className="stack stack--center stack--spaced">

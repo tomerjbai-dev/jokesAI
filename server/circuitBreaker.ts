@@ -1,6 +1,8 @@
 // Circuit breaker for the AI call (ARCHITECTURE §2.7). State lives in this Function instance only,
 // so it is not global and resets whenever the instance is replaced.
 
+import { logEvent, type CircuitStateName } from './log.js'
+
 export type CircuitSettings = { circuitFailureThreshold: number; circuitOpenMs: number }
 
 export type Admission = 'allowed' | 'probe' | 'rejected'
@@ -14,7 +16,7 @@ export function createCircuitBreaker(now: () => number) {
 
   const open = () => {
     openedAt = now()
-    console.warn('circuit breaker opened')
+    logEvent({ event: 'circuit_opened', failures })
   }
 
   const acquire = (settings: CircuitSettings): Admission => {
@@ -26,6 +28,7 @@ export function createCircuitBreaker(now: () => number) {
   }
 
   const recordSuccess = () => {
+    if (openedAt !== null) logEvent({ event: 'circuit_closed' })
     failures = 0
     openedAt = null
     probeInFlight = false
@@ -43,7 +46,7 @@ export function createCircuitBreaker(now: () => number) {
     probeInFlight = false
   }
 
-  const state = () => (openedAt === null ? 'closed' : probeInFlight ? 'half-open' : 'open')
+  const state = (): CircuitStateName => (openedAt === null ? 'closed' : probeInFlight ? 'half-open' : 'open')
 
   return { acquire, recordSuccess, recordFailure, releaseProbe, state }
 }

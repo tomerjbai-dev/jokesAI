@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { validateTopic, WHITESPACE_TOPIC_MESSAGE } from '../shared/topic.js'
 import {
   GENERAL_FAILURE_MESSAGE,
@@ -11,7 +12,9 @@ import {
 } from './errors.js'
 import { cookieHeader, json, startRequest } from './http.js'
 import { generateJoke as defaultGenerateJoke } from './jokeService.js'
+import { logEvent } from './log.js'
 import { clientIp, rateKeys } from './rateLimiter.js'
+import { guardJsonPost } from './requestGuard.js'
 import { serializeUsageCookie } from './usageCookie.js'
 import { defaultUsageState, globalCount, type UsageState } from './usageState.js'
 
@@ -19,22 +22,44 @@ const MAX_PREVIOUS_JOKE_LENGTH = 500
 
 export type JokeHandlerDeps = { generateJoke?: typeof defaultGenerateJoke; state?: UsageState }
 
+// Writes one privacy-safe log line per request: status, error code, latency and circuit state only.
+export async function handleJokeRequest(request: Request, deps: JokeHandlerDeps = {}): Promise<Response> {
+  const started = performance.now()
+  const state = deps.state ?? defaultUsageState
+  const response = await handle(request, deps.generateJoke ?? defaultGenerateJoke, state)
+  let code = 'OK'
+  if (!response.ok) {
+    const body = (await response.clone().json().catch(() => null)) as { code?: unknown } | null
+    code = typeof body?.code === 'string' ? body.code : 'UNKNOWN'
+  }
+  logEvent({
+    event: 'joke_request',
+    requestId: request.headers.get('x-vercel-id') ?? randomUUID(),
+    status: response.status,
+    code,
+    latencyMs: Math.round(performance.now() - started),
+    circuit: state.circuitBreaker.state(),
+  })
+  return response
+}
+
 // All limits below are best effort: they hold within one Function instance and one cookie,
 // not across parallel requests, replayed cookies or other instances (ARCHITECTURE §2.5).
-export async function handleJokeRequest(request: Request, deps: JokeHandlerDeps = {}): Promise<Response> {
-  const { generateJoke = defaultGenerateJoke, state = defaultUsageState } = deps
+async function handle(
+  request: Request,
+  generateJoke: typeof defaultGenerateJoke,
+  state: UsageState,
+): Promise<Response> {
+  // Origin, Content-Type and size come first: nothing is counted and no cookie is issued for them.
+  const guarded = await guardJsonPost(request)
+  if (guarded instanceof Response) return guarded
+  const { body } = guarded
+
   const context = startRequest(request, state)
-  if (context instanceof Response) return context
   const { config, today, usage } = context
   const error = (status: number, body: ErrorBody, headers: Record<string, string> = {}) =>
     json(status, body, { ...cookieHeader(context), ...headers })
 
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    return error(400, { code: 'INVALID_TOPIC', message: GENERAL_FAILURE_MESSAGE })
-  }
   if (typeof body !== 'object' || body === null) {
     return error(400, { code: 'INVALID_TOPIC', message: GENERAL_FAILURE_MESSAGE })
   }

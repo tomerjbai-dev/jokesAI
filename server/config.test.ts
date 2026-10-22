@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULTS, readConfig } from './config.js'
+import { BUILT_IN_COOKIE_SECRET, DEFAULTS, readConfig } from './config.js'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -20,7 +20,7 @@ const NAMES = [
 describe('readConfig', () => {
   it('uses the ARCHITECTURE defaults when nothing is set', () => {
     for (const name of NAMES) vi.stubEnv(name, '')
-    expect(readConfig()).toEqual({ ...DEFAULTS, cookieSecret: null })
+    expect(readConfig()).toEqual({ ...DEFAULTS, cookieSecret: BUILT_IN_COOKIE_SECRET })
     expect(DEFAULTS).toEqual({
       personalDailyLimit: 20,
       globalDailyLimit: 100,
@@ -61,8 +61,8 @@ describe('readConfig', () => {
     expect(readConfig().timeZone).toBe('Asia/Jerusalem')
   })
 
-  it('rejects a secret shorter than 32 characters', () => {
-    vi.stubEnv('COOKIE_SIGNING_SECRET', 'short')
-    expect(readConfig().cookieSecret).toBeNull()
+  it.each(['', 'short'])('uses the built-in secret when the secret is %j', (value) => {
+    vi.stubEnv('COOKIE_SIGNING_SECRET', value)
+    expect(readConfig().cookieSecret).toBe(BUILT_IN_COOKIE_SECRET)
   })
 })

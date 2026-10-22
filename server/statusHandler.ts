@@ -14,7 +14,6 @@ export type StatusBody = {
 export function handleStatusRequest(request: Request, deps: { state?: UsageState } = {}): Response {
   const { state = defaultUsageState } = deps
   const context = startRequest(request, state)
-  if (context instanceof Response) return context
   const { config, today, usage } = context
 
   const body: StatusBody = {

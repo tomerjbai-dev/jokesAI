@@ -8,6 +8,9 @@ export const RATE_LIMIT_MESSAGE = 'רגע, גם לקומיקאי מגיע לנש
 
 export type ErrorCode =
   | 'INVALID_TOPIC'
+  | 'FORBIDDEN_ORIGIN'
+  | 'UNSUPPORTED_MEDIA_TYPE'
+  | 'PAYLOAD_TOO_LARGE'
   | 'UNSUPPORTED_TOPIC'
   | 'RATE_LIMITED'
   | 'PERSONAL_QUOTA_EXCEEDED'

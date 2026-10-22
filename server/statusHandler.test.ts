@@ -20,6 +20,7 @@ let clock: number
 let state: UsageState
 
 beforeEach(() => {
+  vi.spyOn(console, 'log').mockImplementation(() => {})
   vi.stubEnv('COOKIE_SIGNING_SECRET', SECRET)
   clock = NOON
   state = createUsageState(() => clock)
@@ -58,7 +59,11 @@ describe('GET /api/status', () => {
     const post = () =>
       new Request('http://localhost/api/jokes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '203.0.113.7' },
+        headers: {
+          Origin: 'http://localhost',
+          'Content-Type': 'application/json',
+          'x-forwarded-for': '203.0.113.7',
+        },
         body: '{}',
       })
     for (let i = 0; i < 5; i++) await handleJokeRequest(post(), { generateJoke, state })
@@ -73,9 +78,8 @@ describe('GET /api/status', () => {
     expect(await handleStatusRequest(get(), { state }).json()).not.toHaveProperty('retryAfterSeconds')
   })
 
-  it('fails without a signing secret', () => {
+  it('works without a signing secret (built-in fallback, ADR-19)', () => {
     vi.stubEnv('COOKIE_SIGNING_SECRET', '')
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(handleStatusRequest(get(), { state }).status).toBe(500)
+    expect(handleStatusRequest(get(), { state }).status).toBe(200)
   })
 })
